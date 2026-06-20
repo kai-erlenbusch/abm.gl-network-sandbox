@@ -1,17 +1,18 @@
 {
-  "name": "Epidemic GPU",
+  "name": "Ant Colony GPU",
   "controls": [
     { "type": "button", "id": "setup", "label": "Setup" },
     { "type": "toggle", "id": "go", "label": "Go" },
-    { "type": "number", "id": "agent_count", "label": "Agent Count (Max 1M)", "min": 1, "max": 1000000, "step": 1000, "default": 100000 },
+    { "type": "slider", "id": "model_speed", "label": "Model Speed", "min": 0.0, "max": 10.0, "step": 0.1, "default": 1.0 },
+    { "type": "number", "id": "agent_count", "label": "Ant Count", "min": 1, "max": 100000, "step": 100, "default": 125 },
     { "type": "slider", "id": "world_size", "label": "World Size", "min": 10.0, "max": 200.0, "step": 5.0 },
-    { "type": "slider", "id": "infection_radius", "label": "Infection Radius", "min": 0.05, "max": 1.0, "step": 0.05 },
-    { "type": "slider", "id": "initial_infected", "label": "Initial Infected", "min": 1, "max": 1000, "step": 1 },
-    { "type": "slider", "id": "transmission_probability", "label": "Transmission Probability", "min": 0.0, "max": 1.0, "step": 0.01 },
-    { "type": "slider", "id": "recovery_time", "label": "Recovery Time (sec)", "min": 1.0, "max": 60.0, "step": 1.0 }
+    { "type": "slider", "id": "interaction_radius", "label": "Smell Radius", "min": 0.05, "max": 5.0, "step": 0.05 },
+    { "type": "slider", "id": "evaporation_rate", "label": "Evaporation Rate", "min": 0.0, "max": 1.0, "step": 0.01 },
+    { "type": "slider", "id": "diffusion_rate", "label": "Diffusion Rate", "min": 0.0, "max": 1.0, "step": 0.01 },
+    { "type": "slider", "id": "pheromone_drop_rate", "label": "Pheromone Drop Rate", "min": 1.0, "max": 100.0, "step": 1.0 }
   ],
   "plots": [
-    { "id": "telemetry", "title": "Real-time Telemetry" }
+    { "id": "telemetry", "title": "Food In Nest" }
   ],
   "monitors": [
     { "id": "macro_engine", "label": "Macro Engine", "value": "Shachi (Python LLM)" }

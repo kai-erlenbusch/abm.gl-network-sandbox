@@ -147,7 +147,7 @@ function TelemetryChart() {
         const chart = await ChartGPU.create(containerRef.current, {
           series: [
             { 
-              name: 'Healthy',
+              name: 'Food 1',
               type: 'line', 
               data: [], 
               sampling: 'none',
@@ -155,7 +155,7 @@ function TelemetryChart() {
               style: { color: '#10b981', lineWidth: 2 } // emerald-500
             },
             { 
-              name: 'Infected',
+              name: 'Food 2',
               type: 'line', 
               data: [], 
               sampling: 'none',
@@ -163,7 +163,7 @@ function TelemetryChart() {
               style: { color: '#ef4444', lineWidth: 2 } // red-500
             },
             { 
-              name: 'Recovered',
+              name: 'Food 3',
               type: 'line', 
               data: [], 
               sampling: 'none',
@@ -181,7 +181,7 @@ function TelemetryChart() {
           }
         }
       } catch (err) {
-        console.warn("ChartGPU failed to initialize (likely due to WebGPU resource limits at 500k+ agents).", err);
+        console.warn("ChartGPU failed to initialize.", err);
       }
     }
     
@@ -200,17 +200,15 @@ function TelemetryChart() {
     const handleTelemetry = (e: any) => {
       if (!chartInstanceRef.current) return;
       
-      const { timestamp, total_healthy, total_infected, total_recovered } = e.detail;
-      const elapsed = (timestamp - startTime.current) / 1000; // seconds
+      const { food } = e.detail;
+      const elapsed = (Date.now() - startTime.current) / 1000; // seconds
 
       const currentIsPaused = useSimulationStore.getState().isPaused;
 
-      if (!currentIsPaused) {
-        if (typeof chartInstanceRef.current.appendData === 'function') {
-          chartInstanceRef.current.appendData(0, [[elapsed, total_healthy || 0]]);
-          chartInstanceRef.current.appendData(1, [[elapsed, total_infected || 0]]);
-          chartInstanceRef.current.appendData(2, [[elapsed, total_recovered || 0]]);
-        }
+      if (!currentIsPaused && food && typeof chartInstanceRef.current.appendData === 'function') {
+        chartInstanceRef.current.appendData(0, [[elapsed, food[0] || 0]]);
+        chartInstanceRef.current.appendData(1, [[elapsed, food[1] || 0]]);
+        chartInstanceRef.current.appendData(2, [[elapsed, food[2] || 0]]);
       }
     };
 
@@ -237,77 +235,84 @@ function TelemetryChart() {
   );
 }
 
-// Phase 6: High-performance raw DOM Heatmap (Zero React Re-renders)
-function SpatialHeatmap() {
-  const cellsRef = useRef<(HTMLDivElement | null)[]>([]);
+function MetricsPanel() {
+  const agentCount = useSimulationStore(state => state.dynamicParams.agent_count);
+  const [metrics, setMetrics] = useState({ 
+    ticks: 0, 
+    transiting: 0, 
+    totalDist: 0, 
+    collectedFood: 0,
+    collectionRate: 0 
+  });
+  const maxFoodRef = useRef(0);
+  
+  useEffect(() => {
+    // Reset maxFood when agent count changes (usually means reset)
+    maxFoodRef.current = 0;
+  }, [agentCount]);
 
   useEffect(() => {
-    const handleTelemetry = (e: any) => {
-      const { grid } = e.detail;
-      if (!grid) return;
-
-      let maxDensity = 0;
-      for (let r = 0; r < 10; r++) {
-        for (let c = 0; c < 10; c++) {
-          if (grid[r][c].density > maxDensity) {
-            maxDensity = grid[r][c].density;
-          }
-        }
-      }
-
-      // Dynamic max to adapt to actual density (so colors are always visible)
-      // Cap minimum at 100 to prevent division by zero or extreme noise
-      const MAX_THEORETICAL = Math.max(100, maxDensity * 1.2, grid[0][0]?.density * 1.5 || 100);
-
-      for (let r = 0; r < 10; r++) {
-        for (let c = 0; c < 10; c++) {
-          const index = r * 10 + c;
-          const cellNode = cellsRef.current[index];
-          if (!cellNode) continue;
-
-          const cell = grid[r][c];
-          const count = cell.density;
-          
-          if (count === 0) {
-            cellNode.style.backgroundColor = 'transparent';
-            continue;
-          }
-
-          const infected = cell.infected_count;
-          const recovered = cell.recovered_count ?? 0;
-          const susceptible = Math.max(0, count - infected - recovered);
-
-          // Ratios S/I/R
-          const pS = susceptible / count;
-          const pI = infected / count;
-          const pR = recovered / count;
-
-          // RGB blend S=(0, 255, 136) I=(255, 51, 102) R=(0, 128, 255)
-          const rColor = Math.round(pS * 0 + pI * 255 + pR * 0);
-          const gColor = Math.round(pS * 255 + pI * 51 + pR * 128);
-          const bColor = Math.round(pS * 136 + pI * 102 + pR * 255);
-
-          // Overall brightness based on physical density
-          const opacity = Math.min(count / MAX_THEORETICAL, 1.0);
-
-          cellNode.style.backgroundColor = `rgba(${rColor}, ${gColor}, ${bColor}, ${Math.max(opacity, 0.2)})`;
-        }
-      }
+    let currentTicks = 0;
+    const handleTicks = (e: any) => {
+       currentTicks = e.detail.ticks;
+       setMetrics(m => ({ ...m, ticks: currentTicks }));
     };
-
+    
+    const handleTelemetry = (e: any) => {
+       const foodSum = (e.detail.food[0] || 0) + (e.detail.food[1] || 0) + (e.detail.food[2] || 0);
+       // Track the maximum food seen (initial food)
+       if (foodSum > maxFoodRef.current) maxFoodRef.current = foodSum;
+       
+       const collected = maxFoodRef.current - foodSum;
+       // Assuming ~60 ticks per second, rate = collected / (ticks / 60)
+       const rate = currentTicks > 0 ? (collected / (currentTicks / 60)) : 0;
+       
+       setMetrics(m => ({ 
+         ...m, 
+         transiting: e.detail.transiting, 
+         totalDist: e.detail.totalDist,
+         collectedFood: collected,
+         collectionRate: rate
+       }));
+    };
+    
+    window.addEventListener('abm-ticks', handleTicks);
     window.addEventListener('abm-telemetry', handleTelemetry);
-    return () => window.removeEventListener('abm-telemetry', handleTelemetry);
+    return () => {
+      window.removeEventListener('abm-ticks', handleTicks);
+      window.removeEventListener('abm-telemetry', handleTelemetry);
+    };
   }, []);
 
   return (
-    <div className="w-full aspect-square bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden grid grid-cols-10 grid-rows-10 gap-[1px]">
-      {Array.from({ length: 100 }).map((_, i) => (
-        <div 
-          key={i} 
-          ref={(el) => { cellsRef.current[i] = el; }}
-          className="w-full h-full bg-transparent"
-        />
-      ))}
+    <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Ant Count</div>
+        <div className="text-sm font-bold text-neutral-200">{agentCount?.toLocaleString()}</div>
+      </div>
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Time Elapsed</div>
+        <div className="text-sm font-bold text-neutral-200">
+          {Math.floor(metrics.ticks / 3600).toString().padStart(2, '0')}:
+          {Math.floor((metrics.ticks / 60) % 60).toString().padStart(2, '0')}
+        </div>
+      </div>
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Transiting Food</div>
+        <div className="text-sm font-bold text-emerald-400">{metrics.transiting.toLocaleString()}</div>
+      </div>
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Collected Food</div>
+        <div className="text-sm font-bold text-blue-400">{Math.floor(metrics.collectedFood).toLocaleString()}</div>
+      </div>
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Collection Rate</div>
+        <div className="text-sm font-bold text-neutral-200">{metrics.collectionRate.toFixed(1)} /s</div>
+      </div>
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Total Distance</div>
+        <div className="text-sm font-bold text-neutral-200">{Math.floor(metrics.totalDist).toLocaleString()}</div>
+      </div>
     </div>
   );
 }
@@ -315,35 +320,97 @@ function SpatialHeatmap() {
 export default function DashboardOverlay() {
   const isPaused = useSimulationStore(state => state.isPaused);
   const setIsPaused = useSimulationStore(state => state.setIsPaused);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="absolute top-4 left-4 z-10 w-96 text-white font-mono text-sm bg-black/50 backdrop-blur-md p-6 rounded-xl border border-neutral-800 shadow-2xl pointer-events-auto">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-            abm.gl
-          </h1>
-          <p className="text-neutral-400 text-xs tracking-wider uppercase mt-1">Next.js Command Center</p>
-        </div>
+    <>
+      <style>{`
+        .glass-scroll::-webkit-scrollbar {
+          width: 6px;
+        }
+        .glass-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .glass-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+        .glass-scroll:hover::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.25);
+        }
+      `}</style>
+      
+      <div className={`absolute top-4 left-4 z-10 text-white font-mono text-sm bg-black/50 backdrop-blur-md rounded-xl border border-neutral-800 shadow-2xl pointer-events-auto transition-all duration-300 ease-in-out ${isCollapsed ? 'w-16 h-16 cursor-pointer flex items-center justify-center' : 'w-96 h-[95vh] p-6'}`}
+           onClick={() => isCollapsed && setIsCollapsed(false)}>
         
-        {/* Status indicator */}
-        <div className="flex items-center space-x-2">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-          </span>
-          <span className="text-xs text-emerald-400">Live</span>
-        </div>
-      </div>
+        {isCollapsed ? (
+          <div className="text-emerald-400 font-bold text-xl">≡</div>
+        ) : (
+          <div className="h-full w-full overflow-y-auto overflow-x-hidden glass-scroll pr-2">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                  abm.gl
+                </h1>
+                <p className="text-neutral-400 text-xs tracking-wider uppercase mt-1">Ant Simulation</p>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs text-emerald-400">Live</span>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsCollapsed(true); }}
+                  className="text-neutral-400 hover:text-white transition-colors"
+                  title="Collapse Sidebar"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
       
       <div className="space-y-4">
         <div className="bg-neutral-900/50 p-4 rounded-lg border border-neutral-800">
-          {modelSchema.monitors.map((m: any) => (
-            <div key={m.id} className="flex justify-between text-xs mb-1 text-neutral-400">
-              <span>{m.label}</span>
-              <span>{m.value}</span>
-            </div>
-          ))}
+          <div className="flex justify-between items-center text-xs mb-1 text-neutral-400">
+            <span>Environment Map</span>
+          </div>
+          <select 
+            className="w-full bg-neutral-800 text-neutral-200 text-xs rounded border border-neutral-700 px-2 py-1 outline-none focus:border-emerald-500 mt-1 mb-2"
+            value={useSimulationStore((state) => state.mapType)}
+            onChange={(e) => {
+              useSimulationStore.getState().setMapType(e.target.value as any);
+              useSimulationStore.getState().setIsPaused(true);
+              useSimulationStore.getState().triggerSetup();
+            }}
+          >
+            <option value="open">Open World</option>
+            <option value="maze_1">Maze 1</option>
+            <option value="maze_2">Maze 2</option>
+            <option value="maze_3">Maze 3</option>
+            <option value="maze_4">Maze 4</option>
+            <option value="maze_5">Maze 5</option>
+            <option value="maze_6">Maze 6</option>
+            <option value="maze_7">Maze 7</option>
+            <option value="maze_8">Maze 8</option>
+          </select>
+
+          <div className="flex items-center justify-between text-xs text-neutral-400 mt-2">
+            <span>Visual Trails</span>
+            <button
+              onClick={() => useSimulationStore.getState().setVisualTrails(!useSimulationStore.getState().visualTrails)}
+              className={`px-2 py-1 rounded transition-colors ${
+                useSimulationStore.getState().visualTrails 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  : 'bg-neutral-800 text-neutral-500 border border-neutral-700'
+              }`}
+            >
+              {useSimulationStore.getState().visualTrails ? 'ON' : 'OFF'}
+            </button>
+          </div>
         </div>
 
         <div className="pt-4 border-t border-neutral-800">
@@ -364,16 +431,19 @@ export default function DashboardOverlay() {
           </div>
         </div>
 
-        <div>
-          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Real-time Telemetry</h2>
-          <TelemetryChart />
+        <div className="pt-4 border-t border-neutral-800">
+          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Metrics</h2>
+          <MetricsPanel />
         </div>
 
         <div className="pt-4 border-t border-neutral-800">
-          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Spatial Density Grid</h2>
-          <SpatialHeatmap />
+          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Real-time Telemetry (Food Piles)</h2>
+          <TelemetryChart />
         </div>
       </div>
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -1,0 +1,37 @@
+abstract: "The Communication-Based Model of Perceived Descriptive Norm Dynamics in\
+  \ Digital Networks (COMM-PDND) is an agent-based model specifically created to examine\
+  \ the dynamics of perceived descriptive norms in the context of digital network\
+  \ structures. The model, developed as part of a master\u2019s thesis titled \u201C\
+  The Dynamics of Perceived Descriptive Norms in Digital Network Publics: An Agent-Based\
+  \ Simulation,\u201D emphasizes the critical role of communication processes in norm\
+  \ formation. It focuses on the role of communicative interactions in shaping perceived\
+  \ descriptive norms.\n\nThe COMM-PDND is tuned to explore the effects of normative\
+  \ deviance in digital social networks. It provides functionalities for manipulating\
+  \ agents according to their network position, and has a versatile set of customizable\
+  \ parameters, making it adaptable to a wide range of research contexts."
+authors:
+- email: lars.reinelt@gmail.com
+  family-names: Reinelt
+  given-names: Lars
+cff-version: 1.2.0
+date-released: '2023-09-08'
+identifiers:
+- type: url
+  value: https://www.comses.net/codebases/343d242e-a85b-4c06-848b-56ba87558609/releases/1.0.0/
+keywords:
+- ABM
+- communicative action
+- deviance
+- diffusion of information
+- hk model
+- norm dynamics
+- norm inference
+- norm signaling
+- social norms
+license: CC-BY-NC-SA-4.0
+message: If you use this software, please cite it using the metadata from this file.
+title: 'COMM-PDND: Communication-Based Model of Perceived Descriptive Norm Dynamics
+  in Digital Networks'
+type: software
+url: https://www.comses.net/codebases/343d242e-a85b-4c06-848b-56ba87558609/releases/1.0.0/
+version: 1.0.0
