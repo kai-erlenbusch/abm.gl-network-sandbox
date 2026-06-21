@@ -21,11 +21,10 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
   const timeAccumulator = useRef(0);
 
   useEffect(() => {
-    if (setupTrigger > lastSetupTrigger.current) {
+    if (setupPass) {
       needsSetupRef.current = true;
-      lastSetupTrigger.current = setupTrigger;
     }
-  }, [setupTrigger]);
+  }, [setupPass]);
 
   useFrame(async (state, delta) => {
     if (!(state.gl as any).__initialized) return;
