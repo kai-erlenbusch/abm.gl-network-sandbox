@@ -3,7 +3,7 @@ import { storage, float, Fn, If, uint, vec4, instanceIndex, Loop, uniform, mod }
 import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { prngHash } from '../math/PRNG';
 
-export const MAX_NODES = 2000;
+export const MAX_NODES = 50000;
 
 export class VirusDynamicsEngine {
     agentCount: number;

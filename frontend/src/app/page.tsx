@@ -81,50 +81,52 @@ async function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, i
   }
   
   // Apply a simple spring layout for 50 iterations to make it look like NetLogo
-  for (let iter = 0; iter < 50; iter++) {
-      if (iter % 5 === 0) await new Promise(r => setTimeout(r, 0)); // Yield to main thread
-      const forces = Array.from({ length: n }, () => ({ x: 0, y: 0 }));
-      
-      // Repulsion
-      for (let i = 0; i < n; i++) {
-          for (let j = i + 1; j < n; j++) {
-              const dx = nodes[i].x - nodes[j].x;
-              const dy = nodes[i].y - nodes[j].y;
-              let d2 = dx*dx + dy*dy;
-              if (d2 === 0) d2 = 0.1;
-              if (d2 < 25000) { 
-                  const d = Math.sqrt(d2);
-                  const force = 150 / d; 
-                  forces[i].x += (dx / d) * force;
-                  forces[i].y += (dy / d) * force;
-                  forces[j].x -= (dx / d) * force;
-                  forces[j].y -= (dy / d) * force;
+  if (n <= 5000) {
+      for (let iter = 0; iter < 50; iter++) {
+          if (iter % 5 === 0) await new Promise(r => setTimeout(r, 0)); // Yield to main thread
+          const forces = Array.from({ length: n }, () => ({ x: 0, y: 0 }));
+          
+          // Repulsion
+          for (let i = 0; i < n; i++) {
+              for (let j = i + 1; j < n; j++) {
+                  const dx = nodes[i].x - nodes[j].x;
+                  const dy = nodes[i].y - nodes[j].y;
+                  let d2 = dx*dx + dy*dy;
+                  if (d2 === 0) d2 = 0.1;
+                  if (d2 < 25000) { 
+                      const d = Math.sqrt(d2);
+                      const force = 150 / d; 
+                      forces[i].x += (dx / d) * force;
+                      forces[i].y += (dy / d) * force;
+                      forces[j].x -= (dx / d) * force;
+                      forces[j].y -= (dy / d) * force;
+                  }
               }
           }
-      }
-      
-      // Springs
-      for (const link of links) {
-          const n1 = nodes[link.sourceIndex];
-          const n2 = nodes[link.targetIndex];
-          const dx = n2.x - n1.x;
-          const dy = n2.y - n1.y;
-          const d = Math.sqrt(dx*dx + dy*dy) || 0.1;
           
-          const force = (d - 30) * 0.1; 
-          forces[link.sourceIndex].x += (dx / d) * force;
-          forces[link.sourceIndex].y += (dy / d) * force;
-          forces[link.targetIndex].x -= (dx / d) * force;
-          forces[link.targetIndex].y -= (dy / d) * force;
-      }
-      
-      // Apply forces
-      for (let i = 0; i < n; i++) {
-          nodes[i].x += Math.max(-50, Math.min(50, forces[i].x || 0));
-          nodes[i].y += Math.max(-50, Math.min(50, forces[i].y || 0));
-          // Gravity towards center
-          nodes[i].x -= nodes[i].x * 0.05;
-          nodes[i].y -= nodes[i].y * 0.05;
+          // Springs
+          for (const link of links) {
+              const n1 = nodes[link.sourceIndex];
+              const n2 = nodes[link.targetIndex];
+              const dx = n2.x - n1.x;
+              const dy = n2.y - n1.y;
+              const d = Math.sqrt(dx*dx + dy*dy) || 0.1;
+              
+              const force = (d - 30) * 0.1; 
+              forces[link.sourceIndex].x += (dx / d) * force;
+              forces[link.sourceIndex].y += (dy / d) * force;
+              forces[link.targetIndex].x -= (dx / d) * force;
+              forces[link.targetIndex].y -= (dy / d) * force;
+          }
+          
+          // Apply forces
+          for (let i = 0; i < n; i++) {
+              nodes[i].x += Math.max(-50, Math.min(50, forces[i].x || 0));
+              nodes[i].y += Math.max(-50, Math.min(50, forces[i].y || 0));
+              // Gravity towards center
+              nodes[i].x -= nodes[i].x * 0.05;
+              nodes[i].y -= nodes[i].y * 0.05;
+          }
       }
   }
   
