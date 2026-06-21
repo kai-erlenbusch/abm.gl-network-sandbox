@@ -48,5 +48,14 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) to view the simulation.
 
 ## Architecture Highlights
-- **No-React-Render Telemetry**: The graph and charts are driven entirely by custom DOM manipulation (`useRef` and `innerText`) and `setOption` commands, bypassing React's standard render cycle to maintain a flawless 60 FPS under heavy load.
 - **Custom StrictMode Bypasses**: The telemetry chart utilizes manual buffer management and array truncation to completely sidestep React 18 Strict Mode double-mounting memory leaks.
+
+## Citations & Licensing
+
+This project is a high-performance GPU re-implementation inspired by the NetLogo models library. If you use or mention this model in a publication, please include the following citations as requested by the original authors:
+
+**For the model itself:**
+> Stonedahl, F. and Wilensky, U. (2008). NetLogo Virus on a Network model. http://ccl.northwestern.edu/netlogo/models/VirusonaNetwork. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
+
+**For the NetLogo software:**
+> Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
