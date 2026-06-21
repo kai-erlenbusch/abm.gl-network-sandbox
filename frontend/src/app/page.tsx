@@ -393,15 +393,21 @@ export default function Home() {
                 let countResistant = 0;
                 
                 const stateArr = new Float32Array(stateBuffer);
-                
-                if (!colorArrayRef.current || colorArrayRef.current.length !== N * 4) {
-                    colorArrayRef.current = new Float32Array(N * 4);
-                }
-                const colorArr = colorArrayRef.current;
-                
-                for(let i = 0; i < N; i++) {
-                    const state = Math.round(stateArr[i * 4]);
-                    network.nodes[i].state = state;
+              if (stateArr.length === 0) {
+                  console.error("stateArr is EMPTY!");
+              } else {
+                  // Log first few elements just to see
+                  console.log("stateArr[0..3]:", stateArr[0], stateArr[1], stateArr[2], stateArr[3]);
+              }
+              
+              if (!colorArrayRef.current || colorArrayRef.current.length !== N * 4) {
+                  colorArrayRef.current = new Float32Array(N * 4);
+              }
+              const colorArr = colorArrayRef.current;
+              
+              for(let i = 0; i < N; i++) {
+                  const state = Math.round(stateArr[i * 4]);
+                  network.nodes[i].state = state;
                     
                     if (state === 0) {
                         countSusceptible++;

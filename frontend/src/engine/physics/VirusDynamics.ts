@@ -104,7 +104,8 @@ export class VirusDynamicsEngine {
                 
             }).ElseIf(currentState.equal(1.0), () => {
                 // Infected: Check for recovery
-                If(currentTimer.equal(0.0), () => {
+                If(currentTimer.greaterThanEqual(this.uniforms.virusCheckFrequency), () => {
+                    currentTimer.assign(0.0);
                     const rollRecovery = rand(rSeed.add(1.0));
                     If(rollRecovery.lessThan(this.uniforms.recoveryChance), () => {
                         const rollResist = rand(rSeed.add(2.0));
