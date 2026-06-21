@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 import DashboardOverlay from '@/components/DashboardOverlay';
 import { useSimulationStore } from '@/store/simulationStore';
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
-import { VirusDynamicsEngine, MAX_NODES, MAX_NEIGHBORS } from '@/engine/physics/VirusDynamics';
+import { VirusDynamicsEngine, MAX_NODES } from '@/engine/physics/VirusDynamics';
 import { Graph } from '@cosmos.gl/graph';
 
 type VirusNode = {
@@ -41,17 +41,11 @@ function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initial
       const n1Index = Math.floor(Math.random() * n);
       const n1 = nodes[n1Index];
       
-      if (adjacency[n1Index].length >= MAX_NEIGHBORS) {
-          failedAttempts++;
-          continue;
-      }
-  
       let closestNodeIndex = -1;
       let minDistance = Infinity;
       for (let i = 0; i < n; i++) {
           if (i === n1Index) continue;
           if (adjacency[n1Index].includes(i)) continue;
-          if (adjacency[i].length >= MAX_NEIGHBORS) continue;
           
           const d = dist(n1, nodes[i]);
           if (d < minDistance) {
@@ -243,14 +237,20 @@ export default function Home() {
       if (network.nodes.length === 0) return { engine: null, setupPass: null, passes: [] };
       
       const n = network.nodes.length;
-      const engine = new VirusDynamicsEngine(n);
+      
+      let totalEdges = 0;
+      for (let i = 0; i < n; i++) totalEdges += network.adjacency[i].length;
+      
+      const engine = new VirusDynamicsEngine(n, totalEdges);
       
       const stateBufferRead = engine.stateBufferRead.value.array as Float32Array;
       const stateBufferWrite = engine.stateBufferWrite.value.array as Float32Array;
       
       const neighborCounts = engine.neighborCounts.value.array as Uint32Array;
-      const neighborMatrix = engine.neighborMatrix.value.array as Uint32Array;
+      const neighborStartIndices = engine.neighborStartIndices.value.array as Uint32Array;
+      const neighborDestinations = engine.neighborDestinations.value.array as Uint32Array;
       
+      let currentEdgeIdx = 0;
       for (let i = 0; i < n; i++) {
           const node = network.nodes[i];
           
@@ -262,15 +262,17 @@ export default function Home() {
           
           const neighbors = network.adjacency[i];
           neighborCounts[i] = neighbors.length;
+          neighborStartIndices[i] = currentEdgeIdx;
           for (let j = 0; j < neighbors.length; j++) {
-             neighborMatrix[i * MAX_NEIGHBORS + j] = neighbors[j];
+             neighborDestinations[currentEdgeIdx++] = neighbors[j];
           }
       }
       
       engine.stateBufferRead.value.needsUpdate = true;
       engine.stateBufferWrite.value.needsUpdate = true;
       engine.neighborCounts.value.needsUpdate = true;
-      engine.neighborMatrix.value.needsUpdate = true;
+      engine.neighborStartIndices.value.needsUpdate = true;
+      engine.neighborDestinations.value.needsUpdate = true;
       
       return { engine, setupPass: engine.setupPass, passes: [engine.simulationPass, engine.copyPass] };
   }, [network.adjacency]);

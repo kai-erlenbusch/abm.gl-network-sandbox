@@ -4,7 +4,6 @@ import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { prngHash } from '../math/PRNG';
 
 export const MAX_NODES = 2000;
-export const MAX_NEIGHBORS = 50;
 
 export class VirusDynamicsEngine {
     agentCount: number;
@@ -13,7 +12,8 @@ export class VirusDynamicsEngine {
     stateBufferWrite: any;
     
     neighborCounts: any;
-    neighborMatrix: any;
+    neighborStartIndices: any;
+    neighborDestinations: any;
 
     setupPass: any;
     simulationPass: any;
@@ -27,7 +27,7 @@ export class VirusDynamicsEngine {
         randomSeed: any;
     };
 
-    constructor(agentCount = MAX_NODES) {
+    constructor(agentCount = MAX_NODES, totalEdges = 0) {
         this.agentCount = agentCount;
 
         this.uniforms = {
@@ -42,7 +42,8 @@ export class VirusDynamicsEngine {
         this.stateBufferWrite = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
         
         this.neighborCounts = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
-        this.neighborMatrix = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount * MAX_NEIGHBORS), 1), 'uint', agentCount * MAX_NEIGHBORS);
+        this.neighborStartIndices = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
+        this.neighborDestinations = storage(new StorageInstancedBufferAttribute(new Uint32Array(totalEdges), 1), 'uint', totalEdges);
 
         this.setupPass = Fn(() => {
             const i = instanceIndex;
@@ -78,10 +79,11 @@ export class VirusDynamicsEngine {
             If(currentState.equal(0.0), () => {
                 // Susceptible: Pull infection
                 const myNeighborCount = this.neighborCounts.element(i);
+                const startIdx = this.neighborStartIndices.element(i);
                 const infectedNeighbors = float(0.0).toVar();
                 
                 Loop({ start: uint(0), end: myNeighborCount, type: 'uint', condition: '<' }, ({ i: j }: any) => {
-                    const neighborIdx = this.neighborMatrix.element(i.mul(MAX_NEIGHBORS).add(j));
+                    const neighborIdx = this.neighborDestinations.element(startIdx.add(j));
                     const nState = this.stateBufferRead.element(neighborIdx).x;
                     If(nState.equal(1.0), () => {
                         infectedNeighbors.addAssign(1.0);

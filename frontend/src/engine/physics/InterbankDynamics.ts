@@ -4,7 +4,6 @@ import { StorageInstancedBufferAttribute } from 'three/webgpu';
 
 // Simulation Constants
 export const MAX_BANKS = 2000; 
-export const MAX_NEIGHBORS = 20;
 
 export class InterbankDynamicsEngine {
     agentCount: number;
@@ -15,7 +14,8 @@ export class InterbankDynamicsEngine {
     metadataStateWrite: any;  
     
     neighborCounts: any;
-    neighborMatrix: any;
+    neighborStartIndices: any;
+    neighborDestinations: any;
 
     setupPass: any;
     simulationPass: any;
@@ -28,7 +28,7 @@ export class InterbankDynamicsEngine {
         customerDepositRate: any;
     };
 
-    constructor(agentCount = MAX_BANKS) {
+    constructor(agentCount = MAX_BANKS, totalEdges = 0) {
         this.agentCount = agentCount;
 
         this.uniforms = {
@@ -44,7 +44,8 @@ export class InterbankDynamicsEngine {
         this.metadataStateWrite = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
         
         this.neighborCounts = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
-        this.neighborMatrix = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount * MAX_NEIGHBORS), 1), 'uint', agentCount * MAX_NEIGHBORS);
+        this.neighborStartIndices = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
+        this.neighborDestinations = storage(new StorageInstancedBufferAttribute(new Uint32Array(totalEdges), 1), 'uint', totalEdges);
 
         this.setupPass = Fn(() => {
             const i = instanceIndex;
@@ -117,10 +118,11 @@ export class InterbankDynamicsEngine {
 
                 // --- CONTAGION LOGIC ---
                 const myNeighborCount = this.neighborCounts.element(i);
+                const startIdx = this.neighborStartIndices.element(i);
                 const contagionLoss = float(0.0).toVar();
                 
                 Loop({ start: uint(0), end: myNeighborCount, type: 'uint', condition: '<' }, ({ i: j }: any) => {
-                    const neighborIdx = this.neighborMatrix.element(i.mul(MAX_NEIGHBORS).add(j));
+                    const neighborIdx = this.neighborDestinations.element(startIdx.add(j));
                     
                     // Crucial: Always read neighbors' state from the deterministic Read buffer!
                     const nFin = this.financialStateRead.element(neighborIdx);
