@@ -6,7 +6,19 @@ This repository is a dedicated sandbox for network-based agent experimentation w
 
 Unlike the primary `abm.gl` framework which focuses on massive-scale spatial ABMs using Three.js WebGPU compute shaders, this sandbox is specifically tuned for **Network Theory** and **Graph-Based Simulations**. 
 
-It uses `@cosmos.gl/graph` for highly optimized WebGL rendering of nodes and edges, allowing us to visualize complex, interconnected populations in real-time.
+### The Model: Virus on a Network
+
+This sandbox implements a high-performance GPU-accelerated version of the classic [NetLogo "Virus on a Network" model](https://ccl.northwestern.edu/netlogo/models/VirusonaNetwork). 
+
+![abm.gl Epidemic Virus Screenshot](screenshot.png)
+
+This model demonstrates the spread of a virus through a network (e.g. modeling the progress of a computer virus/worm). Each node represents an entity (like a computer) and can be in one of three states:
+- **Susceptible (Blue)**: Healthy but vulnerable.
+- **Infected (Red)**: Currently carrying and spreading the virus.
+- **Resistant (Gray)**: Immune to the virus (e.g. patched with antivirus).
+
+**How it works:**
+Each tick, infected nodes attempt to infect all their neighbors. Susceptible neighbors will be infected based on the `virus-spread-chance`. Infected nodes periodically check if they are infected based on `virus-check-frequency`. If detected, they have a `recovery-chance` to be healed. Recovered nodes then have a `gain-resistance-chance` to become permanently resistant.
 
 ### Key Technologies
 - **Rendering**: `@cosmos.gl/graph` for ultra-fast 2D WebGL graph rendering.
