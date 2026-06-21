@@ -272,8 +272,10 @@ export default function Home() {
       const neighborDestinations = engine.neighborDestinations.value.array as Uint32Array;
       
       let currentEdgeIdx = 0;
+      let infectedCount = 0;
       for (let i = 0; i < n; i++) {
           const node = network.nodes[i];
+          if (node.state === 1) infectedCount++;
           
           stateBufferRead[i * 4] = node.state;
           stateBufferRead[i * 4 + 1] = node.timer;
@@ -288,6 +290,7 @@ export default function Home() {
              neighborDestinations[currentEdgeIdx++] = neighbors[j];
           }
       }
+      log("Engine init: nodes " + n + " infected " + infectedCount);
       
       engine.stateBufferRead.value.needsUpdate = true;
       engine.stateBufferWrite.value.needsUpdate = true;
@@ -295,6 +298,7 @@ export default function Home() {
       engine.neighborStartIndices.value.needsUpdate = true;
       engine.neighborDestinations.value.needsUpdate = true;
       
+      engineRef.current = engine;
       return { engine, setupPass: engine.setupPass, passes: [engine.simulationPass, engine.copyPass] };
   }, [network.adjacency]);
 
@@ -309,8 +313,6 @@ export default function Home() {
       engine.uniforms.gainResistanceChance.value = (gain_resistance_chance ?? 5.0) / 100.0;
       engine.uniforms.randomSeed.value = Math.random();
   }, [virus_spread_chance, virus_check_frequency, recovery_chance, gain_resistance_chance]);
-
-    // Removed redundant useEffect that was setting raw slider values without /100 conversion
 
     const lastUpdateRef = useRef(0);
     const lastLogRef = useRef(0);
@@ -331,6 +333,32 @@ export default function Home() {
             return;
         }
         
+        if (ticksToRun === 0) {
+            // Only report telemetry from CPU state to avoid wiping out the initial state before GPU is fully primed
+            const N = network.nodes.length;
+            let countSusceptible = 0;
+            let countInfected = 0;
+            let countResistant = 0;
+            
+            for(let i = 0; i < N; i++) {
+                const state = network.nodes[i].state;
+                if (state === 0) countSusceptible++;
+                else if (state === 1) countInfected++;
+                else if (state === 2) countResistant++;
+            }
+            
+            window.dispatchEvent(new CustomEvent('abm-telemetry', { 
+                detail: { 
+                    susceptible: countSusceptible,
+                    infected: countInfected,
+                    resistant: countResistant,
+                    total: N,
+                    ticksToRun: 0
+                } 
+            }));
+            return;
+        }
+
         if (readbackPendingRef.current) return;
         readbackPendingRef.current = true;
 
