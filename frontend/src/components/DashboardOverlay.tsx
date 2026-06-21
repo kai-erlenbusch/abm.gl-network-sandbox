@@ -129,7 +129,7 @@ function FPSMeter() {
       }
       
       if (useSimulationStore.getState().isPaused) return;
-      localTicks.current++;
+      localTicks.current += (e.detail?.ticksToRun || 1);
       
       if (ticksRef.current) {
         ticksRef.current.innerText = localTicks.current.toString();
@@ -304,6 +304,18 @@ export default function DashboardOverlay() {
   const isPaused = useSimulationStore(state => state.isPaused);
   const setIsPaused = useSimulationStore(state => state.setIsPaused);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    const handleGenStart = () => setIsGenerating(true);
+    const handleGenEnd = () => setIsGenerating(false);
+    window.addEventListener('abm-generating-start', handleGenStart);
+    window.addEventListener('abm-generating-end', handleGenEnd);
+    return () => {
+      window.removeEventListener('abm-generating-start', handleGenStart);
+      window.removeEventListener('abm-generating-end', handleGenEnd);
+    };
+  }, []);
 
   return (
     <>
@@ -379,6 +391,13 @@ export default function DashboardOverlay() {
           </div>
         )}
       </div>
+
+      {isGenerating && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <h2 className="text-white text-xl font-mono font-bold tracking-widest">GENERATING NETWORK...</h2>
+        </div>
+      )}
     </>
   );
 }

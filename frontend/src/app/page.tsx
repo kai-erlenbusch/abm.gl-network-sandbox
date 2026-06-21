@@ -20,7 +20,7 @@ const AbmCompute = dynamic(() => import('@/components/AbmCanvas'), {
   loading: () => null
 });
 
-function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initialOutbreakSize: number) {
+async function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initialOutbreakSize: number) {
   const nodes = Array.from({ length: n }, (_, i) => ({ 
       id: i.toString(), 
       index: i, 
@@ -33,6 +33,7 @@ function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initial
   
   const targetLinks = Math.floor((avgDegree * n) / 2);
   const adjacency: number[][] = Array.from({ length: n }, () => []);
+  const adjacencySets: Set<number>[] = Array.from({ length: n }, () => new Set());
 
   const dist = (n1: VirusNode, n2: VirusNode) => Math.sqrt((n1.x - n2.x)**2 + (n1.y - n2.y)**2);
 
@@ -45,7 +46,7 @@ function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initial
       let minDistance = Infinity;
       for (let i = 0; i < n; i++) {
           if (i === n1Index) continue;
-          if (adjacency[n1Index].includes(i)) continue;
+          if (adjacencySets[n1Index].has(i)) continue;
           
           const d = dist(n1, nodes[i]);
           if (d < minDistance) {
@@ -63,6 +64,8 @@ function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initial
           });
           adjacency[n1Index].push(closestNodeIndex);
           adjacency[closestNodeIndex].push(n1Index);
+          adjacencySets[n1Index].add(closestNodeIndex);
+          adjacencySets[closestNodeIndex].add(n1Index);
           failedAttempts = 0;
       } else {
           failedAttempts++;
@@ -79,6 +82,7 @@ function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, initial
   
   // Apply a simple spring layout for 50 iterations to make it look like NetLogo
   for (let iter = 0; iter < 50; iter++) {
+      if (iter % 5 === 0) await new Promise(r => setTimeout(r, 0)); // Yield to main thread
       const forces = Array.from({ length: n }, () => ({ x: 0, y: 0 }));
       
       // Repulsion
@@ -227,10 +231,20 @@ export default function Home() {
   }, [network]);
 
   useEffect(() => {
+     let mounted = true;
      const n = Math.min(agentCount, MAX_NODES);
-     const { nodes, links, adjacency } = generateSpatiallyClusteredNetwork(n, avgDegree, initialOutbreakSize);
-     setNetwork({ nodes, links, adjacency });
-     window.dispatchEvent(new CustomEvent('abm-ticks', { detail: { ticks: 0 } }));
+     
+     const buildNetwork = async () => {
+         window.dispatchEvent(new CustomEvent('abm-generating-start'));
+         const { nodes, links, adjacency } = await generateSpatiallyClusteredNetwork(n, avgDegree, initialOutbreakSize);
+         if (!mounted) return;
+         setNetwork({ nodes, links, adjacency });
+         window.dispatchEvent(new CustomEvent('abm-generating-end'));
+         window.dispatchEvent(new CustomEvent('abm-ticks', { detail: { ticks: 0 } }));
+     };
+     
+     buildNetwork();
+     return () => { mounted = false; };
   }, [setupTrigger, agentCount, avgDegree, initialOutbreakSize]);
   
   const { engine, setupPass, passes } = useMemo(() => {
@@ -294,7 +308,7 @@ export default function Home() {
     const lastUpdateRef = useRef(0);
     const lastLogRef = useRef(0);
 
-    const renderCallback = useCallback(async (gl: any, delta: number) => {
+    const renderCallback = useCallback(async (gl: any, delta: number, ticksToRun: number) => {
         if (!engine) {
             if (!readbackPendingRef.current) {
                 readbackPendingRef.current = true;
@@ -355,7 +369,7 @@ export default function Home() {
                     }
                 }
                 
-                graph.setPointColors(new Float32Array(colorArr));
+                graph.setPointColors(colorArr);
                 graph.render();
                 
                 const now = performance.now();
@@ -369,7 +383,8 @@ export default function Home() {
                 
                 window.dispatchEvent(new CustomEvent('abm-frame', {
                     detail: { 
-                        food: [countSusceptible, countInfected, countResistant]
+                        food: [countSusceptible, countInfected, countResistant],
+                        ticksToRun
                     }
                 }));
 

@@ -1,5 +1,5 @@
 // @ts-ignore
-import { storage, float, Fn, If, uint, vec4, instanceIndex, Loop, uniform } from 'three/tsl';
+import { storage, float, Fn, If, uint, vec4, instanceIndex, Loop, uniform, mod } from 'three/tsl';
 import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { prngHash } from '../math/PRNG';
 
@@ -74,7 +74,7 @@ export class VirusDynamicsEngine {
             const nextState = currentState.toVar();
             
             // Random base seed for this node for this tick
-            const rSeed = this.uniforms.randomSeed.add(float(i).mul(0.1)).add(totalTicks.mul(13.37));
+            const rSeed = this.uniforms.randomSeed.add(float(i).mul(0.1)).add(mod(totalTicks, 10000.0).mul(13.37));
             
             If(currentState.equal(0.0), () => {
                 // Susceptible: Pull infection

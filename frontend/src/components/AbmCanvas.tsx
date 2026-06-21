@@ -6,7 +6,7 @@ import { useSimulationStore } from '@/store/simulationStore';
 export interface AbmComputeProps {
   setupPass: any; 
   computePasses: any[]; 
-  renderCallback?: (gl: any, delta: number) => void;
+  renderCallback?: (gl: any, delta: number, ticksToRun: number) => void;
   updateUniforms?: () => void;
 }
 
@@ -30,8 +30,6 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
   useFrame(async (state, delta) => {
     if (!(state.gl as any).__initialized) return;
 
-    window.dispatchEvent(new CustomEvent('abm-frame'));
-
     const gl = state.gl as any;
 
     if (needsSetupRef.current && setupPass) {
@@ -40,6 +38,7 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
         needsSetupRef.current = false;
     }
 
+    let finalTicksToRun = 0;
     if (!isPaused && computePasses.length > 0) {
         try {
           const ticksPerSecond = modelSpeed * 6.0; // scale up to 60 TPS at max speed
@@ -58,6 +57,7 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
               }
           }
 
+          finalTicksToRun = ticksToRun;
           for (let i = 0; i < ticksToRun; i++) {
               if (updateUniforms) updateUniforms();
               for (const pass of computePasses) {
@@ -70,7 +70,7 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
     }
 
     if (renderCallback) {
-       renderCallback(gl, delta);
+       renderCallback(gl, delta, finalTicksToRun);
     }
   });
 
