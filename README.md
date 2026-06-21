@@ -52,7 +52,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the simulation.
 
 ## Citations & Licensing
 
-This project is a high-performance GPU re-implementation inspired by the NetLogo models library. If you use or mention this model in a publication, please include the following citations as requested by the original authors:
+This project is a high-performance GPU re-implementation inspired by the NetLogo models library, this model is from the following original authors:
 
 **For the model itself:**
 > Stonedahl, F. and Wilensky, U. (2008). NetLogo Virus on a Network model. http://ccl.northwestern.edu/netlogo/models/VirusonaNetwork. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
