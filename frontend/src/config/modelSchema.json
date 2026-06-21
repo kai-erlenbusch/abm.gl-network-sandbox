@@ -4,7 +4,7 @@
     { "type": "button", "id": "setup", "label": "Setup" },
     { "type": "toggle", "id": "go", "label": "Go" },
     { "type": "slider", "id": "model_speed", "label": "Model Speed", "min": 0.0, "max": 10.0, "step": 0.1, "default": 1.0 },
-    { "type": "number", "id": "number_of_nodes", "label": "number-of-nodes", "min": 10, "max": 50000, "step": 100, "default": 2000 },
+    { "type": "number", "id": "number_of_nodes", "label": "number-of-nodes", "min": 50, "max": 50000, "step": 50, "default": 2000 },
     { "type": "slider", "id": "average_node_degree", "label": "average-node-degree", "min": 1, "max": 15, "step": 1, "default": 6 },
     { "type": "slider", "id": "initial_outbreak_size", "label": "initial-outbreak-size", "min": 1, "max": 50, "step": 1, "default": 3 },
     { "type": "slider", "id": "virus_spread_chance", "label": "virus-spread-chance (%)", "min": 0.0, "max": 1.0, "step": 0.005, "default": 0.025 },

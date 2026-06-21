@@ -26,7 +26,7 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
     }
   }, [setupPass]);
 
-  useFrame(async (state, delta) => {
+  useFrame((state, delta) => {
     if (!(state.gl as any).__initialized) return;
 
     window.dispatchEvent(new CustomEvent('abm-render-frame'));
@@ -71,7 +71,7 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
     }
 
     if (renderCallback) {
-       renderCallback(gl, delta, finalTicksToRun);
+       renderCallback(gl, delta, finalTicksToRun)?.catch((e: any) => console.error("Render callback error", e));
     }
   });
 
