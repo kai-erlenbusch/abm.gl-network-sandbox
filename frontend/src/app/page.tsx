@@ -304,6 +304,25 @@ export default function Home() {
 
   const { virus_spread_chance, virus_check_frequency, recovery_chance, gain_resistance_chance } = useSimulationStore(state => state.dynamicParams);
   
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleRejection = (event: PromiseRejectionEvent) => {
+        console.error("Unhandled promise rejection:", event.reason);
+        setGlobalError(String(event.reason?.stack || event.reason || "Unknown promise rejection"));
+    };
+    const handleError = (event: ErrorEvent) => {
+        console.error("Global error:", event.error);
+        setGlobalError(String(event.error?.stack || event.error || "Unknown global error"));
+    };
+    window.addEventListener('unhandledrejection', handleRejection);
+    window.addEventListener('error', handleError);
+    return () => {
+        window.removeEventListener('unhandledrejection', handleRejection);
+        window.removeEventListener('error', handleError);
+    };
+  }, []);
+
   const updateUniforms = useCallback(() => {
       if (!engineRef.current) return;
       const engine = engineRef.current;
@@ -319,17 +338,11 @@ export default function Home() {
 
     const renderCallback = useCallback(async (gl: any, delta: number, ticksToRun: number) => {
         if (!engine) {
-            if (!readbackPendingRef.current) {
-                readbackPendingRef.current = true;
-                log("renderCallback missing engine");
-            }
+            log("renderCallback missing engine");
             return;
         }
         if (!graphRef.current) {
-            if (!readbackPendingRef.current) {
-                readbackPendingRef.current = true;
-                log("renderCallback missing graph");
-            }
+            log("renderCallback missing graph");
             return;
         }
         
@@ -431,9 +444,15 @@ export default function Home() {
     }, [engine, network]);
 
 
-  return (
+    return (
     <main className="relative w-full h-screen overflow-hidden bg-[#0a0a0a]">
-      <div className="absolute inset-0 z-0">
+        {globalError && (
+            <div className="absolute top-0 left-0 w-full z-50 bg-red-900/90 text-white p-4 font-mono text-xs whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                <h3 className="text-red-300 font-bold mb-2">CRITICAL ERROR</h3>
+                {globalError}
+            </div>
+        )}
+        <div className="absolute inset-0 z-0">
           <div 
               ref={divRef} 
               className="w-full h-full"
