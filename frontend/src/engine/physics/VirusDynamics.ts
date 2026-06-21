@@ -1,5 +1,7 @@
-import { storage, float, Fn, If, uint, vec4, instanceIndex, Loop, uniform, sin, fract } from 'three/tsl';
+// @ts-ignore
+import { storage, float, Fn, If, uint, vec4, instanceIndex, Loop, uniform } from 'three/tsl';
 import { StorageInstancedBufferAttribute } from 'three/webgpu';
+import { prngHash } from '../math/PRNG';
 
 export const MAX_NODES = 2000;
 export const MAX_NEIGHBORS = 50;
@@ -48,9 +50,9 @@ export class VirusDynamicsEngine {
             this.stateBufferWrite.element(i).assign(this.stateBufferRead.element(i));
         })().compute(this.agentCount);
 
-        const rand = Fn(([seed]) => {
-            // Pseudo-random hash
-            return fract(sin(seed.mul(12.9898).add(float(instanceIndex).mul(78.233))).mul(43758.5453));
+        const rand = Fn(([seed]: any) => {
+            // Pseudo-random hash using properly distributed PRNG
+            return prngHash(uint(seed.mul(10000.0)));
         });
 
         this.simulationPass = Fn(() => {
@@ -78,7 +80,7 @@ export class VirusDynamicsEngine {
                 const myNeighborCount = this.neighborCounts.element(i);
                 const infectedNeighbors = float(0.0).toVar();
                 
-                Loop({ start: uint(0), end: myNeighborCount, type: 'uint', condition: '<' }, ({ i: j }) => {
+                Loop({ start: uint(0), end: myNeighborCount, type: 'uint', condition: '<' }, ({ i: j }: any) => {
                     const neighborIdx = this.neighborMatrix.element(i.mul(MAX_NEIGHBORS).add(j));
                     const nState = this.stateBufferRead.element(neighborIdx).x;
                     If(nState.equal(1.0), () => {

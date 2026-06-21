@@ -159,7 +159,7 @@ function FPSMeter() {
   );
 }
 
-export const initialChartOptions: ChartGPUOptions = {
+export const initialChartOptions: any = {
   theme: 'dark',
   animation: false,
   xAxis: { type: 'linear' },

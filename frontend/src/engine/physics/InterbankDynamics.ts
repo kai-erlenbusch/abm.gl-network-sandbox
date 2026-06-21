@@ -9,16 +9,17 @@ export const MAX_NEIGHBORS = 20;
 export class InterbankDynamicsEngine {
     agentCount: number;
 
-    financialState: any; // vec4(Assets, Liabilities, NetWorth, AvailableFunds)
-    metadataState: any;  // vec4(OperatingCosts, VelocityNW, IsBankrupt, Padding)
+    financialStateRead: any; 
+    financialStateWrite: any; 
+    metadataStateRead: any;  
+    metadataStateWrite: any;  
     
     neighborCounts: any;
     neighborMatrix: any;
 
     setupPass: any;
-    financialUpdatePass: any;
-    interbankContagionPass: any;
-    bankruptcyPass: any;
+    simulationPass: any;
+    copyPass: any;
 
     uniforms: {
         baseInterestRate: any;
@@ -37,105 +38,97 @@ export class InterbankDynamicsEngine {
             customerDepositRate: uniform(5.0)
         };
 
-        this.financialState = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
-        this.metadataState = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
+        this.financialStateRead = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
+        this.financialStateWrite = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
+        this.metadataStateRead = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
+        this.metadataStateWrite = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
         
         this.neighborCounts = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
         this.neighborMatrix = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount * MAX_NEIGHBORS), 1), 'uint', agentCount * MAX_NEIGHBORS);
 
         this.setupPass = Fn(() => {
             const i = instanceIndex;
-            // Force buffer creation on GPU so readback doesn't fail when paused
-            this.financialState.element(i).assign(this.financialState.element(i));
-            this.metadataState.element(i).assign(this.metadataState.element(i));
+            // Prevent compiler from optimizing out the buffers by copying initial data to the write buffer
+            this.financialStateWrite.element(i).assign(this.financialStateRead.element(i));
+            this.metadataStateWrite.element(i).assign(this.metadataStateRead.element(i));
         })().compute(this.agentCount);
 
-        this.financialUpdatePass = Fn(() => {
+        this.simulationPass = Fn(() => {
             const i = instanceIndex;
             
-            const meta = this.metadataState.element(i);
-            const isBankrupt = meta.z;
+            // 1. Read start-of-tick state
+            const meta = this.metadataStateRead.element(i);
+            const fin = this.financialStateRead.element(i);
+            
+            const opCosts = meta.x.toVar();
+            const velocityNW = meta.y.toVar();
+            const isBankrupt = meta.z.toVar();
+            const remotenessNW = meta.w.toVar();
+            
+            const assets = fin.x.toVar();
+            const liabilities = fin.y.toVar();
+            const nw = fin.z.toVar();
+            const available = fin.w.toVar();
             
             If(isBankrupt.equal(0.0), () => {
-                const fin = this.financialState.element(i);
-                const assets = fin.x;
-                const liabilities = fin.y;
-                let nw = fin.z;
-                let available = fin.w;
-                
+                // --- FINANCIAL UPDATE LOGIC ---
                 // Income from assets
                 const income = assets.mul(this.uniforms.baseInterestRate);
                 
                 // Outlay for liabilities
-                const outlay = liabilities.mul(this.uniforms.baseInterestRate).mul(0.8); // pay slightly less than we earn on assets
+                const outlay = liabilities.mul(this.uniforms.baseInterestRate).mul(0.8);
                 
-                // Operating costs: C# Logic => NW > 0 ? 4*NW : 1
-                const opCosts = float(1.0).toVar();
+                // Operating costs
+                opCosts.assign(1.0);
                 If(nw.greaterThan(0.0), () => {
                     opCosts.assign(nw.mul(4.0));
                 });
                 
-                // Customer deposits (simplified continuous flow)
+                // Customer deposits
                 const deposits = this.uniforms.customerDepositRate;
                 
                 // Update available funds
-                available = available.add(income).sub(outlay).sub(opCosts).add(deposits);
+                available.assign(available.add(income).sub(outlay).sub(opCosts).add(deposits));
                 
-                // New liabilities from new deposits
-                const newLiabilities = liabilities.add(deposits);
+                // New liabilities
+                liabilities.assign(liabilities.add(deposits));
                 
                 // New assets from loans
                 const newLoans = available.mul(0.5);
-                const newAssets = assets.add(newLoans);
-                available = available.sub(newLoans);
+                assets.assign(assets.add(newLoans));
+                available.assign(available.sub(newLoans));
                 
-                // Net worth = Assets - Liabilities
-                nw = newAssets.sub(newLiabilities);
+                // Net worth
+                const prevNW = nw.toVar();
+                nw.assign(assets.sub(liabilities));
                 
                 // Velocity
-                const prevNW = fin.z;
-                const velocityNW = nw.sub(prevNW);
+                velocityNW.assign(nw.sub(prevNW));
                 
                 // Remoteness NW
-                const remotenessNW = float(0.0).toVar();
+                remotenessNW.assign(0.0);
                 If(nw.lessThan(0.0), () => {
                     remotenessNW.assign(0.0);
                 }).ElseIf(velocityNW.greaterThanEqual(-1.0), () => {
-                    remotenessNW.assign(2147483647.0); // max value approx
+                    remotenessNW.assign(2147483647.0); 
                 }).Else(() => {
                     remotenessNW.assign( nw.div(velocityNW.abs()).ceil() );
                 });
-                
-                this.financialState.element(i).assign(vec4(newAssets, newLiabilities, nw, available));
-                this.metadataState.element(i).assign(vec4(opCosts, velocityNW, 0.0, remotenessNW));
-            });
-        })().compute(this.agentCount);
 
-        this.interbankContagionPass = Fn(() => {
-            const i = instanceIndex;
-            const meta = this.metadataState.element(i);
-            const isBankrupt = meta.z;
-            
-            If(isBankrupt.equal(0.0), () => {
-                const fin = this.financialState.element(i);
-                const myNW = fin.z;
-                let myAssets = fin.x;
-                
+                // --- CONTAGION LOGIC ---
                 const myNeighborCount = this.neighborCounts.element(i);
-                
-                // Contagion: if neighbors are struggling (NW < 0), they drag me down (I lose assets)
                 const contagionLoss = float(0.0).toVar();
                 
-                Loop({ start: uint(0), end: myNeighborCount, type: 'uint', condition: '<' }, ({ i: j }) => {
+                Loop({ start: uint(0), end: myNeighborCount, type: 'uint', condition: '<' }, ({ i: j }: any) => {
                     const neighborIdx = this.neighborMatrix.element(i.mul(MAX_NEIGHBORS).add(j));
-                    const nFin = this.financialState.element(neighborIdx);
+                    
+                    // Crucial: Always read neighbors' state from the deterministic Read buffer!
+                    const nFin = this.financialStateRead.element(neighborIdx);
                     const nNW = nFin.z;
-                    const nBankrupt = this.metadataState.element(neighborIdx).z;
+                    const nBankrupt = this.metadataStateRead.element(neighborIdx).z;
                     
                     If(nBankrupt.equal(0.0), () => {
                         If(nNW.lessThan(0.0), () => {
-                            // Neighbor is insolvent but not yet officially bankrupt.
-                            // We take a hit proportional to contagion risk.
                             const hit = nNW.abs().mul(this.uniforms.interbankContagionRisk);
                             contagionLoss.addAssign(hit);
                         });
@@ -143,33 +136,35 @@ export class InterbankDynamicsEngine {
                 });
                 
                 If(contagionLoss.greaterThan(0.0), () => {
-                    myAssets = myAssets.sub(contagionLoss);
-                    const newNW = myAssets.sub(fin.y);
-                    this.financialState.element(i).assign(vec4(myAssets, fin.y, newNW, fin.w));
+                    assets.assign(assets.sub(contagionLoss));
+                    nw.assign(assets.sub(liabilities));
+                });
+
+                // --- BANKRUPTCY LOGIC ---
+                If(nw.lessThanEqual(0.0), () => {
+                    isBankrupt.assign(1.0);
+                    remotenessNW.assign(0.0);
+                    assets.assign(0.0);
+                    liabilities.assign(0.0);
+                    nw.assign(0.0);
+                    available.assign(0.0);
                 });
             });
+
+            // Write out the strictly calculated results for this tick to the Write buffers
+            this.financialStateWrite.element(i).assign(vec4(assets, liabilities, nw, available));
+            this.metadataStateWrite.element(i).assign(vec4(opCosts, velocityNW, isBankrupt, remotenessNW));
         })().compute(this.agentCount);
 
-        this.bankruptcyPass = Fn(() => {
+        this.copyPass = Fn(() => {
             const i = instanceIndex;
-            const meta = this.metadataState.element(i);
-            const isBankrupt = meta.z;
-            
-            If(isBankrupt.equal(0.0), () => {
-                const fin = this.financialState.element(i);
-                const nw = fin.z;
-                
-                If(nw.lessThanEqual(0.0), () => {
-                    // Mark as bankrupt
-                    this.metadataState.element(i).assign(vec4(meta.x, meta.y, 1.0, 0.0));
-                    // Wipe financial state
-                    this.financialState.element(i).assign(vec4(0.0, 0.0, 0.0, 0.0));
-                });
-            });
+            // Ping-Pong the fully calculated tick back into the read buffers for the next frame
+            this.financialStateRead.element(i).assign(this.financialStateWrite.element(i));
+            this.metadataStateRead.element(i).assign(this.metadataStateWrite.element(i));
         })().compute(this.agentCount);
     }
 
     get passes() {
-        return [this.financialUpdatePass, this.interbankContagionPass, this.bankruptcyPass];
+        return [this.simulationPass, this.copyPass];
     }
 }
