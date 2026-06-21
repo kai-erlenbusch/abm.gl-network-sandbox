@@ -37,53 +37,58 @@ async function generateSpatiallyClusteredNetwork(n: number, avgDegree: number, i
 
   const dist = (n1: VirusNode, n2: VirusNode) => Math.sqrt((n1.x - n2.x)**2 + (n1.y - n2.y)**2);
 
-  let failedAttempts = 0;
-  while (links.length < targetLinks && failedAttempts < 1000) {
-      const n1Index = Math.floor(Math.random() * n);
-      const n1 = nodes[n1Index];
-      
-      let closestNodeIndex = -1;
-      let minDistance = Infinity;
-      for (let i = 0; i < n; i++) {
-          if (i === n1Index) continue;
-          if (adjacencySets[n1Index].has(i)) continue;
-          
-          const d = dist(n1, nodes[i]);
-          if (d < minDistance) {
-              minDistance = d;
-              closestNodeIndex = i;
-          }
-      }
-      
-      if (closestNodeIndex !== -1 && minDistance < 100000) {
-          links.push({
-              source: n1Index.toString(),
-              target: closestNodeIndex.toString(),
-              sourceIndex: n1Index,
-              targetIndex: closestNodeIndex
-          });
-          adjacency[n1Index].push(closestNodeIndex);
-          adjacency[closestNodeIndex].push(n1Index);
-          adjacencySets[n1Index].add(closestNodeIndex);
-          adjacencySets[closestNodeIndex].add(n1Index);
-          failedAttempts = 0;
-      } else {
-          failedAttempts++;
-      }
-  }
-  
-  for (let i = 0; i < initialOutbreakSize; i++) {
-      let r = Math.floor(Math.random() * n);
-      while(nodes[r].state === 1) {
-          r = Math.floor(Math.random() * n);
-      }
-      nodes[r].state = 1;
-  }
-  
-  // Apply a simple spring layout for 50 iterations to make it look like NetLogo
-  if (n <= 5000) {
-      for (let iter = 0; iter < 50; iter++) {
-          if (iter % 5 === 0) await new Promise(r => setTimeout(r, 0)); // Yield to main thread
+    let failedAttempts = 0;
+    let linksGenerated = 0;
+    while (links.length < targetLinks && failedAttempts < 1000) {
+        if (++linksGenerated % 1000 === 0) {
+            await new Promise(r => setTimeout(r, 0)); // Yield to keep UI responsive
+        }
+        
+        const n1Index = Math.floor(Math.random() * n);
+        const n1 = nodes[n1Index];
+        
+        let closestNodeIndex = -1;
+        let minDistance = Infinity;
+        for (let i = 0; i < n; i++) {
+            if (i === n1Index) continue;
+            if (adjacencySets[n1Index].has(i)) continue;
+            
+            const d = dist(n1, nodes[i]);
+            if (d < minDistance) {
+                minDistance = d;
+                closestNodeIndex = i;
+            }
+        }
+        
+        if (closestNodeIndex !== -1 && minDistance < 100000) {
+            links.push({
+                source: n1Index.toString(),
+                target: closestNodeIndex.toString(),
+                sourceIndex: n1Index,
+                targetIndex: closestNodeIndex
+            });
+            adjacency[n1Index].push(closestNodeIndex);
+            adjacency[closestNodeIndex].push(n1Index);
+            adjacencySets[n1Index].add(closestNodeIndex);
+            adjacencySets[closestNodeIndex].add(n1Index);
+            failedAttempts = 0;
+        } else {
+            failedAttempts++;
+        }
+    }
+    
+    for (let i = 0; i < initialOutbreakSize; i++) {
+        let r = Math.floor(Math.random() * n);
+        while(nodes[r].state === 1) {
+            r = Math.floor(Math.random() * n);
+        }
+        nodes[r].state = 1;
+    }
+    
+    // Apply a simple spring layout for 50 iterations to make it look like NetLogo
+    if (n <= 5000) {
+        for (let iter = 0; iter < 50; iter++) {
+            await new Promise(r => setTimeout(r, 0)); // Yield to main thread every iteration
           const forces = Array.from({ length: n }, () => ({ x: 0, y: 0 }));
           
           // Repulsion
