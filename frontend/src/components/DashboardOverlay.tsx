@@ -119,7 +119,7 @@ function FPSMeter() {
   }, [setupTrigger]);
 
   useEffect(() => {
-    const handleTelemetry = (e: any) => {
+    const handleRenderFrame = () => {
       frameCountRef.current++;
       const now = Date.now();
       if (now - lastFpsTimeRef.current >= 1000) {
@@ -127,7 +127,9 @@ function FPSMeter() {
         frameCountRef.current = 0;
         lastFpsTimeRef.current = now;
       }
-      
+    };
+
+    const handleTelemetry = (e: any) => {
       if (useSimulationStore.getState().isPaused) return;
       localTicks.current += (e.detail?.ticksToRun || 1);
       
@@ -146,8 +148,13 @@ function FPSMeter() {
         timeRef.current.innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }
     };
+    
+    window.addEventListener('abm-render-frame', handleRenderFrame);
     window.addEventListener('abm-frame', handleTelemetry);
-    return () => window.removeEventListener('abm-frame', handleTelemetry);
+    return () => {
+      window.removeEventListener('abm-render-frame', handleRenderFrame);
+      window.removeEventListener('abm-frame', handleTelemetry);
+    };
   }, []);
 
   return (

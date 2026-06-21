@@ -30,6 +30,8 @@ function ComputeEngine({ setupPass, computePasses, renderCallback, updateUniform
   useFrame(async (state, delta) => {
     if (!(state.gl as any).__initialized) return;
 
+    window.dispatchEvent(new CustomEvent('abm-render-frame'));
+
     const gl = state.gl as any;
 
     if (needsSetupRef.current && setupPass) {
