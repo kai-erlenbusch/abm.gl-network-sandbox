@@ -35,7 +35,7 @@ export const telemetryAggregateNode = Fn(([positions, velocities, policyMapTextu
     });
 });
 
-export const resetAggregate = Fn(([aggregateBuffer]) => {
+export const resetAggregate = Fn(([aggregateBuffer]: any) => {
     const i = instanceIndex;
     atomicStore(aggregateBuffer.element(i), uint(0));
 });

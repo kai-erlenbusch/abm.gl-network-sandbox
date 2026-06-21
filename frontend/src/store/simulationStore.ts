@@ -12,12 +12,13 @@ export interface SimulationState {
   // Generic parameters mapped from UI
   dynamicParams: {
     model_speed?: number;
-    agent_count?: number;
-    world_size?: number;
-    interaction_radius?: number;
-    evaporation_rate?: number;
-    diffusion_rate?: number;
-    pheromone_drop_rate?: number;
+    number_of_nodes?: number;
+    average_node_degree?: number;
+    initial_outbreak_size?: number;
+    virus_spread_chance?: number;
+    virus_check_frequency?: number;
+    recovery_chance?: number;
+    gain_resistance_chance?: number;
   };
   setDynamicParam: (key: string, value: number) => void;
 
@@ -39,12 +40,13 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   
   dynamicParams: {
     model_speed: 1.0,
-    agent_count: 125,
-    world_size: 50.0,
-    interaction_radius: 1.0,
-    evaporation_rate: 0.1,
-    diffusion_rate: 0.5,
-    pheromone_drop_rate: 60.0,
+    number_of_nodes: 150,
+    average_node_degree: 6,
+    initial_outbreak_size: 3,
+    virus_spread_chance: 0.025,
+    virus_check_frequency: 1.0,
+    recovery_chance: 0.05,
+    gain_resistance_chance: 0.05,
   },
   setDynamicParam: (key: string, value: number) => 
     set((state) => ({ dynamicParams: { ...state.dynamicParams, [key]: value } })),

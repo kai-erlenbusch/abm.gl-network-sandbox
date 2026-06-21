@@ -67,8 +67,8 @@ export const epidemicCollisionNode = Fn(([velocities, infectionBuffer, timerBuff
         const effectiveSearchRadius = max(1, searchRadius);
         const gridSpan = effectiveSearchRadius.mul(2).add(1);
         
-        Loop(gridSpan, ({ i: rIndex }) => {
-            Loop(gridSpan, ({ i: cIndex }) => {
+        Loop(gridSpan, ({ i: rIndex }: any) => {
+            Loop(gridSpan, ({ i: cIndex }: any) => {
                 const rOffset = int(rIndex).sub(effectiveSearchRadius);
                 const cOffset = int(cIndex).sub(effectiveSearchRadius);
                 
@@ -82,7 +82,7 @@ export const epidemicCollisionNode = Fn(([velocities, infectionBuffer, timerBuff
                 // Volume Exclusion Cap
                 const loopCap = min(count, uint(4096));
                 
-                Loop(loopCap, ({ i: j }) => {
+                Loop(loopCap, ({ i: j }: any) => {
                     const jUint = uint(j);
                     const sortedIndex = startIdx.add(jUint);
                     const otherAgentId = sortedAgentIndicesBuffer.element(sortedIndex);

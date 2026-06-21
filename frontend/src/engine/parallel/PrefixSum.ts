@@ -54,7 +54,7 @@ export const spatialPrefixSum_BlockNode = Fn(([chunkSumsBuffer, chunkCountLimit]
     const i = instanceIndex;
     If(i.equal(uint(0)), () => {
         const sum = uint(0).toVar();
-        Loop(chunkCountLimit, ({ i: j }) => {
+        Loop(chunkCountLimit, ({ i: j }: any) => {
             const jUint = uint(j);
             const count = uint(chunkSumsBuffer.element(jUint));
             chunkSumsBuffer.element(jUint).assign(sum);

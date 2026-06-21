@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '@/store/simulationStore';
 import modelSchema from '../config/modelSchema.json';
+import { ChartGPU as Chart, ChartInstance } from 'chartgpu-react';
 
 function SliderWidget({ control }: { control: any }) {
-  const globalValue = useSimulationStore(state => state.dynamicParams[control.id] ?? control.min);
+  const globalValue = useSimulationStore((state: any) => state.dynamicParams[control.id] ?? control.min);
   const setDynamicParam = useSimulationStore(state => state.setDynamicParam);
   
   const [localValue, setLocalValue] = useState(globalValue);
@@ -48,7 +49,7 @@ function SliderWidget({ control }: { control: any }) {
 }
 
 function NumberWidget({ control }: { control: any }) {
-  const value = useSimulationStore(state => state.dynamicParams[control.id] ?? control.default ?? 100000);
+  const value = useSimulationStore((state: any) => state.dynamicParams[control.id] ?? control.default ?? 1000);
   const setDynamicParam = useSimulationStore(state => state.setDynamicParam);
 
   return (
@@ -106,6 +107,16 @@ function FPSMeter() {
   const [fps, setFps] = useState(0);
   const frameCountRef = useRef(0);
   const lastFpsTimeRef = useRef(Date.now());
+  const ticksRef = useRef<HTMLSpanElement>(null);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  const localTicks = useRef(0);
+  const setupTrigger = useSimulationStore(state => state.setupTrigger);
+
+  useEffect(() => {
+    localTicks.current = 0;
+    if (ticksRef.current) ticksRef.current.innerText = "0";
+    if (timeRef.current) timeRef.current.innerText = "00:00:00";
+  }, [setupTrigger]);
 
   useEffect(() => {
     const handleTelemetry = (e: any) => {
@@ -116,202 +127,174 @@ function FPSMeter() {
         frameCountRef.current = 0;
         lastFpsTimeRef.current = now;
       }
+      
+      if (useSimulationStore.getState().isPaused) return;
+      localTicks.current++;
+      
+      if (ticksRef.current) {
+        ticksRef.current.innerText = localTicks.current.toString();
+      }
+      
+      if (timeRef.current) {
+        // Assume 60 ticks = 1 "second" or "hour" of simulation time. 
+        // A simple HH:MM:SS format using 60 ticks = 1 in-game minute
+        // or 1 in-game second. Let's do 60 ticks = 1 second.
+        const totalSeconds = Math.floor(localTicks.current / 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        timeRef.current.innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
     };
     window.addEventListener('abm-frame', handleTelemetry);
     return () => window.removeEventListener('abm-frame', handleTelemetry);
   }, []);
 
   return (
-    <div className="flex justify-between items-center mb-2">
-      <div className="text-xs text-neutral-400">FPS: <span className="text-emerald-400 font-bold">{fps}</span></div>
+    <div className="flex justify-between items-center mb-2 bg-neutral-900/50 p-2 rounded-lg border border-neutral-800">
+      <div className="text-xs text-neutral-400">TICKS: <span ref={ticksRef} className="text-blue-400 font-bold font-mono">0</span></div>
+      <div className="text-xs text-neutral-400">TIME: <span ref={timeRef} className="text-blue-400 font-bold font-mono">00:00:00</span></div>
+      <div className="text-xs text-neutral-400">FPS: <span className="text-amber-400 font-bold font-mono">{fps}</span></div>
     </div>
   );
 }
 
-function TelemetryChart() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<any>(null);
-  const startTime = useRef(Date.now());
-  const [resetKey, setResetKey] = useState(0);
-  const agentCount = useSimulationStore(state => state.dynamicParams.agent_count);
+export const initialChartOptions: ChartGPUOptions = {
+  theme: 'dark',
+  animation: false,
+  xAxis: { type: 'linear' },
+  yAxis: { type: 'linear' },
+  grid: { top: 20, right: 20, bottom: 30, left: 40 },
+  series: [
+    { type: 'line', name: 'Susceptible', color: '#3b82f6', lineStyle: { width: 2 }, data: { x: [], y: [] } },
+    { type: 'line', name: 'Resistant', color: '#6b7280', lineStyle: { width: 2 }, data: { x: [], y: [] } },
+    { type: 'line', name: 'Infected', color: '#ef4444', lineStyle: { width: 2 }, data: { x: [], y: [] } },
+  ]
+};
+
+function MetricsChart() {
+  const chartRef = useRef<ChartInstance | null>(null);
+  const timeRef = useRef(0);
+  const dataRef = useRef<{x: number[], s: number[], r: number[], i: number[]}>({ x: [], s: [], r: [], i: [] });
+  const setupTrigger = useSimulationStore(state => state.setupTrigger);
 
   useEffect(() => {
-    let isMounted = true;
-    startTime.current = Date.now();
-    
-    async function initChart() {
-      if (!containerRef.current) return;
-      
-      try {
-        const { ChartGPU } = await import('chartgpu');
-        const chart = await ChartGPU.create(containerRef.current, {
-          series: [
-            { 
-              name: 'Food 1',
-              type: 'line', 
-              data: [], 
-              sampling: 'none',
-              // @ts-ignore
-              style: { color: '#10b981', lineWidth: 2 } // emerald-500
-            },
-            { 
-              name: 'Food 2',
-              type: 'line', 
-              data: [], 
-              sampling: 'none',
-              // @ts-ignore
-              style: { color: '#ef4444', lineWidth: 2 } // red-500
-            },
-            { 
-              name: 'Food 3',
-              type: 'line', 
-              data: [], 
-              sampling: 'none',
-              // @ts-ignore
-              style: { color: '#3b82f6', lineWidth: 2 } // blue-500
-            }
-          ],
-        });
-        
-        if (isMounted) {
-          chartInstanceRef.current = chart;
-        } else {
-          if (chart && typeof chart.dispose === 'function') {
-            chart.dispose();
-          }
-        }
-      } catch (err) {
-        console.warn("ChartGPU failed to initialize.", err);
-      }
+    timeRef.current = 0;
+    dataRef.current = { x: [], s: [], r: [], i: [] };
+    if (chartRef.current) {
+      chartRef.current.setOption({
+        ...initialChartOptions,
+        series: [
+          { ...initialChartOptions.series[0], data: { x: [], y: [] } },
+          { ...initialChartOptions.series[1], data: { x: [], y: [] } },
+          { ...initialChartOptions.series[2], data: { x: [], y: [] } },
+        ]
+      });
     }
-    
-    initChart();
-
-    return () => {
-      isMounted = false;
-      if (chartInstanceRef.current && typeof chartInstanceRef.current.dispose === 'function') {
-        chartInstanceRef.current.dispose();
-      }
-      chartInstanceRef.current = null;
-    };
-  }, [resetKey, agentCount]);
+  }, [setupTrigger]);
 
   useEffect(() => {
     const handleTelemetry = (e: any) => {
-      if (!chartInstanceRef.current) return;
-      
-      const { food } = e.detail;
-      const elapsed = (Date.now() - startTime.current) / 1000; // seconds
-
-      const currentIsPaused = useSimulationStore.getState().isPaused;
-
-      if (!currentIsPaused && food && typeof chartInstanceRef.current.appendData === 'function') {
-        chartInstanceRef.current.appendData(0, [[elapsed, food[0] || 0]]);
-        chartInstanceRef.current.appendData(1, [[elapsed, food[1] || 0]]);
-        chartInstanceRef.current.appendData(2, [[elapsed, food[2] || 0]]);
+      if (useSimulationStore.getState().isPaused) return;
+      if (e.detail && e.detail.food && chartRef.current) {
+         const t = timeRef.current++;
+         const s = e.detail.food[0];
+         const i = e.detail.food[1];
+         const r = e.detail.food[2];
+         
+         const data = dataRef.current;
+         data.x.push(t);
+         data.s.push(s);
+         data.r.push(r);
+         data.i.push(i);
+         
+         // Keep memory footprint lightweight
+         if (data.x.length > 1000) {
+           data.x.shift();
+           data.s.shift();
+           data.r.shift();
+           data.i.shift();
+         }
+         
+         chartRef.current.setOption({
+            ...initialChartOptions,
+            series: [
+              { ...initialChartOptions.series[0], data: { x: [...data.x], y: [...data.s] } },
+              { ...initialChartOptions.series[1], data: { x: [...data.x], y: [...data.r] } },
+              { ...initialChartOptions.series[2], data: { x: [...data.x], y: [...data.i] } }
+            ]
+         });
       }
     };
-
-    window.addEventListener('abm-telemetry', handleTelemetry);
-    
-    return () => {
-      window.removeEventListener('abm-telemetry', handleTelemetry);
-    };
+    window.addEventListener('abm-frame', handleTelemetry);
+    return () => window.removeEventListener('abm-frame', handleTelemetry);
   }, []);
 
   return (
-    <div className="relative">
-      <div className="absolute top-0 right-0 z-10 flex gap-2">
-        <button 
-           onClick={() => setResetKey(k => k + 1)}
-           className="text-[10px] bg-neutral-800 hover:bg-neutral-700 text-neutral-400 px-2 py-0.5 rounded border border-neutral-700 transition-colors"
-        >
-           ↺ RESET
-        </button>
-      </div>
-      <FPSMeter />
-      <div ref={containerRef} className="w-full h-48 mt-2" />
+    <div className="h-48 mt-2 bg-neutral-900/50 rounded-lg border border-neutral-800 relative p-1 pb-4 overflow-hidden">
+      <Chart 
+        onReady={(c) => { chartRef.current = c; }}
+        options={initialChartOptions}
+      />
     </div>
   );
 }
 
 function MetricsPanel() {
-  const agentCount = useSimulationStore(state => state.dynamicParams.agent_count);
-  const [metrics, setMetrics] = useState({ 
-    ticks: 0, 
-    transiting: 0, 
-    totalDist: 0, 
-    collectedFood: 0,
-    collectionRate: 0 
-  });
-  const maxFoodRef = useRef(0);
+  const agentCount = useSimulationStore(state => state.dynamicParams.number_of_nodes);
+  const [avgAssets, setAvgAssets] = useState("0");
+  const [bankruptcies, setBankruptcies] = useState([0, 0, 0]);
+  const [temperature, setTemperature] = useState(0);
+  const [entropy, setEntropy] = useState(0);
+  const [threatenedNodes, setThreatenedNodes] = useState(0);
   
   useEffect(() => {
-    // Reset maxFood when agent count changes (usually means reset)
-    maxFoodRef.current = 0;
-  }, [agentCount]);
-
-  useEffect(() => {
-    let currentTicks = 0;
-    const handleTicks = (e: any) => {
-       currentTicks = e.detail.ticks;
-       setMetrics(m => ({ ...m, ticks: currentTicks }));
-    };
-    
     const handleTelemetry = (e: any) => {
-       const foodSum = (e.detail.food[0] || 0) + (e.detail.food[1] || 0) + (e.detail.food[2] || 0);
-       // Track the maximum food seen (initial food)
-       if (foodSum > maxFoodRef.current) maxFoodRef.current = foodSum;
-       
-       const collected = maxFoodRef.current - foodSum;
-       // Assuming ~60 ticks per second, rate = collected / (ticks / 60)
-       const rate = currentTicks > 0 ? (collected / (currentTicks / 60)) : 0;
-       
-       setMetrics(m => ({ 
-         ...m, 
-         transiting: e.detail.transiting, 
-         totalDist: e.detail.totalDist,
-         collectedFood: collected,
-         collectionRate: rate
-       }));
+      if (e.detail) {
+          if (typeof e.detail.transiting !== 'undefined') setAvgAssets(e.detail.transiting.toFixed(0));
+          if (e.detail.food) setBankruptcies(e.detail.food);
+          if (typeof e.detail.temperature !== 'undefined') setTemperature(e.detail.temperature);
+          if (typeof e.detail.entropy !== 'undefined') setEntropy(e.detail.entropy);
+          if (typeof e.detail.threatenedNodes !== 'undefined') setThreatenedNodes(e.detail.threatenedNodes);
+      }
     };
-    
-    window.addEventListener('abm-ticks', handleTicks);
-    window.addEventListener('abm-telemetry', handleTelemetry);
-    return () => {
-      window.removeEventListener('abm-ticks', handleTicks);
-      window.removeEventListener('abm-telemetry', handleTelemetry);
-    };
+    window.addEventListener('abm-frame', handleTelemetry);
+    return () => window.removeEventListener('abm-frame', handleTelemetry);
   }, []);
 
+  const countSusceptible = bankruptcies[0] || 0;
+  const countInfected = bankruptcies[1] || 0;
+  const countResistant = bankruptcies[2] || 0;
+  const total = countSusceptible + countInfected + countResistant;
+  const pctSusceptible = total > 0 ? (countSusceptible / total) * 100 : 0;
+  const pctInfected = total > 0 ? (countInfected / total) * 100 : 0;
+  const pctResistant = total > 0 ? (countResistant / total) * 100 : 0;
+
   return (
-    <div className="grid grid-cols-2 gap-2 mb-4">
-      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Ant Count</div>
-        <div className="text-sm font-bold text-neutral-200">{agentCount?.toLocaleString()}</div>
-      </div>
-      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Time Elapsed</div>
-        <div className="text-sm font-bold text-neutral-200">
-          {Math.floor(metrics.ticks / 3600).toString().padStart(2, '0')}:
-          {Math.floor((metrics.ticks / 60) % 60).toString().padStart(2, '0')}
+    <div className="flex flex-col gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+          <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Total Nodes</div>
+          <div className="text-sm font-bold text-neutral-200">{agentCount?.toLocaleString()}</div>
+        </div>
+        <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
+          <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Infected</div>
+          <div className="text-sm font-bold text-red-400">{countInfected.toLocaleString()}</div>
         </div>
       </div>
-      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Transiting Food</div>
-        <div className="text-sm font-bold text-emerald-400">{metrics.transiting.toLocaleString()}</div>
-      </div>
-      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Collected Food</div>
-        <div className="text-sm font-bold text-blue-400">{Math.floor(metrics.collectedFood).toLocaleString()}</div>
-      </div>
-      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Collection Rate</div>
-        <div className="text-sm font-bold text-neutral-200">{metrics.collectionRate.toFixed(1)} /s</div>
-      </div>
-      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800 text-center">
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Total Distance</div>
-        <div className="text-sm font-bold text-neutral-200">{Math.floor(metrics.totalDist).toLocaleString()}</div>
+      <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800">
+        <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2 text-center">Network Status</div>
+        <div className="flex h-3 w-full rounded-full overflow-hidden bg-neutral-800">
+          <div style={{ width: `${pctSusceptible}%` }} className="bg-blue-500 transition-all duration-200"></div>
+          <div style={{ width: `${pctResistant}%` }} className="bg-gray-500 transition-all duration-200"></div>
+          <div style={{ width: `${pctInfected}%` }} className="bg-red-500 transition-all duration-200"></div>
+        </div>
+        <div className="flex justify-between mt-1 px-1">
+          <span className="text-[9px] text-blue-400">{Math.round(pctSusceptible)}% Susceptible</span>
+          <span className="text-[9px] text-gray-400">{Math.round(pctResistant)}% Resistant</span>
+          <span className="text-[9px] text-red-400">{Math.round(pctInfected)}% Infected</span>
+        </div>
+        <MetricsChart />
       </div>
     </div>
   );
@@ -325,19 +308,10 @@ export default function DashboardOverlay() {
   return (
     <>
       <style>{`
-        .glass-scroll::-webkit-scrollbar {
-          width: 6px;
-        }
-        .glass-scroll::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .glass-scroll::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-        }
-        .glass-scroll:hover::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.25);
-        }
+        .glass-scroll::-webkit-scrollbar { width: 6px; }
+        .glass-scroll::-webkit-scrollbar-track { background: transparent; }
+        .glass-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .glass-scroll:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); }
       `}</style>
       
       <div className={`absolute top-4 left-4 z-10 text-white font-mono text-sm bg-black/50 backdrop-blur-md rounded-xl border border-neutral-800 shadow-2xl pointer-events-auto transition-all duration-300 ease-in-out ${isCollapsed ? 'w-16 h-16 cursor-pointer flex items-center justify-center' : 'w-96 h-[95vh] p-6'}`}
@@ -352,7 +326,7 @@ export default function DashboardOverlay() {
                 <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
                   abm.gl
                 </h1>
-                <p className="text-neutral-400 text-xs tracking-wider uppercase mt-1">Ant Simulation</p>
+                <p className="text-neutral-400 text-xs tracking-wider uppercase mt-1">EPIDEMIC VIRUS</p>
               </div>
               
               <div className="flex items-center space-x-3">
@@ -366,81 +340,42 @@ export default function DashboardOverlay() {
                 <button 
                   onClick={(e) => { e.stopPropagation(); setIsCollapsed(true); }}
                   className="text-neutral-400 hover:text-white transition-colors"
-                  title="Collapse Sidebar"
                 >
                   ✕
                 </button>
               </div>
             </div>
       
-      <div className="space-y-4">
-        <div className="bg-neutral-900/50 p-4 rounded-lg border border-neutral-800">
-          <div className="flex justify-between items-center text-xs mb-1 text-neutral-400">
-            <span>Environment Map</span>
-          </div>
-          <select 
-            className="w-full bg-neutral-800 text-neutral-200 text-xs rounded border border-neutral-700 px-2 py-1 outline-none focus:border-emerald-500 mt-1 mb-2"
-            value={useSimulationStore((state) => state.mapType)}
-            onChange={(e) => {
-              useSimulationStore.getState().setMapType(e.target.value as any);
-              useSimulationStore.getState().setIsPaused(true);
-              useSimulationStore.getState().triggerSetup();
-            }}
-          >
-            <option value="open">Open World</option>
-            <option value="maze_1">Maze 1</option>
-            <option value="maze_2">Maze 2</option>
-            <option value="maze_3">Maze 3</option>
-            <option value="maze_4">Maze 4</option>
-            <option value="maze_5">Maze 5</option>
-            <option value="maze_6">Maze 6</option>
-            <option value="maze_7">Maze 7</option>
-            <option value="maze_8">Maze 8</option>
-          </select>
+            <div className="space-y-4">
+              <FPSMeter />
+              <MetricsPanel />
+              
+              <div className="pt-4 border-t border-neutral-800">
+                <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Controls</h2>
+                <div className="flex space-x-2 mb-4">
+                  {modelSchema.controls.filter((c: any) => c.type === 'button' || c.type === 'toggle').map((c: any) => {
+                    if (c.type === 'button') return <SetupButtonWidget key={c.id} control={c} />;
+                    if (c.type === 'toggle') return <ToggleWidget key={c.id} control={c} />;
+                    return null;
+                  })}
+                </div>
+                <div className="space-y-2">
+                  {modelSchema.controls.filter((c: any) => c.type === 'slider' || c.type === 'number').map((c: any) => {
+                    if (c.type === 'slider') return <SliderWidget key={c.id} control={c} />;
+                    if (c.type === 'number') return <NumberWidget key={c.id} control={c} />;
+                    return null;
+                  })}
+                </div>
+              </div>
 
-          <div className="flex items-center justify-between text-xs text-neutral-400 mt-2">
-            <span>Visual Trails</span>
-            <button
-              onClick={() => useSimulationStore.getState().setVisualTrails(!useSimulationStore.getState().visualTrails)}
-              className={`px-2 py-1 rounded transition-colors ${
-                useSimulationStore.getState().visualTrails 
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                  : 'bg-neutral-800 text-neutral-500 border border-neutral-700'
-              }`}
-            >
-              {useSimulationStore.getState().visualTrails ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-neutral-800">
-          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Controls</h2>
-          <div className="flex space-x-2 mb-4">
-            {modelSchema.controls.filter((c: any) => c.type === 'button' || c.type === 'toggle').map((c: any) => {
-              if (c.type === 'button') return <SetupButtonWidget key={c.id} control={c} />;
-              if (c.type === 'toggle') return <ToggleWidget key={c.id} control={c} />;
-              return null;
-            })}
-          </div>
-          <div className="space-y-2">
-            {modelSchema.controls.filter((c: any) => c.type === 'slider' || c.type === 'number').map((c: any) => {
-              if (c.type === 'slider') return <SliderWidget key={c.id} control={c} />;
-              if (c.type === 'number') return <NumberWidget key={c.id} control={c} />;
-              return null;
-            })}
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-neutral-800">
-          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Metrics</h2>
-          <MetricsPanel />
-        </div>
-
-        <div className="pt-4 border-t border-neutral-800">
-          <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Real-time Telemetry (Food Piles)</h2>
-          <TelemetryChart />
-        </div>
-      </div>
+              <div className="pt-4 border-t border-neutral-800">
+                <h2 className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Configuration</h2>
+                <div className="bg-neutral-900/50 p-2 rounded-lg border border-neutral-800">
+                   <div className="text-[10px] text-neutral-400 uppercase tracking-wider mb-1">Architecture</div>
+                   <div className="text-sm font-bold text-blue-400">WebGPU + cosmos.gl (Raw)</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
