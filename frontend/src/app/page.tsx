@@ -353,11 +353,32 @@ export default function Home() {
             let countInfected = 0;
             let countResistant = 0;
             
+            if (!colorArrayRef.current || colorArrayRef.current.length !== N * 4) {
+                colorArrayRef.current = new Float32Array(N * 4);
+            }
+            const colorArr = colorArrayRef.current;
+            
             for(let i = 0; i < N; i++) {
                 const state = network.nodes[i].state;
-                if (state === 0) countSusceptible++;
-                else if (state === 1) countInfected++;
-                else if (state === 2) countResistant++;
+                if (state === 0) {
+                    countSusceptible++;
+                    colorArr[i*4] = 0.4;
+                    colorArr[i*4+1] = 0.4;
+                    colorArr[i*4+2] = 0.4;
+                    colorArr[i*4+3] = 0.3;
+                } else if (state === 1) {
+                    countInfected++;
+                    colorArr[i*4] = 1.0;
+                    colorArr[i*4+1] = 0.0;
+                    colorArr[i*4+2] = 0.0;
+                    colorArr[i*4+3] = 1.0;
+                } else if (state === 2) {
+                    countResistant++;
+                    colorArr[i*4] = 0.0;
+                    colorArr[i*4+1] = 0.0;
+                    colorArr[i*4+2] = 1.0;
+                    colorArr[i*4+3] = 1.0;
+                }
             }
             
             window.dispatchEvent(new CustomEvent('abm-telemetry', { 
@@ -369,6 +390,10 @@ export default function Home() {
                     ticksToRun: 0
                 } 
             }));
+            
+            if (graphRef.current) {
+                graphRef.current.setPointColors(colorArr);
+            }
             return;
         }
 
