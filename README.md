@@ -50,6 +50,13 @@ Open [http://localhost:3000](http://localhost:3000) to view the simulation.
 ## Architecture Highlights
 - **Custom StrictMode Bypasses**: The telemetry chart utilizes manual buffer management and array truncation to completely sidestep React 18 Strict Mode double-mounting memory leaks.
 
+## Changelog & Recent Updates
+- **Algorithmic Gaussian Clustering:** Replaced the unstable WebGL force-directed layout engine with a pure-JavaScript algorithmic clustering generator. This prevents WebGL texture memory crashes on certain hardware and browser configurations when rendering massive (50k+) node networks.
+- **Organic Hub Generation:** The network generator now creates distinct "City Hubs" with a Gaussian distribution, making massive networks readable and visually striking rather than appearing as uniform noise.
+- **Community Edge Wiring:** Edges are now generated using an 85/15 ratio (85% intra-community connections within the same hub, and 15% global "highway" connections), perfectly simulating dense population centers connected by travel routes.
+- **Dynamic Node Scaling:** Point sizes dynamically scale down based on the population `N`, allowing distinct nodes to remain visible without merging into solid blocks of color.
+- **Simulation State Fixes:** Fixed WebGPU buffer state transition bugs where nodes were failing to transition to the "Resistant" state correctly after recovery.
+
 ## Citations & Licensing
 
 This project is a high-performance GPU re-implementation inspired by the NetLogo models library, this model is from the following original authors:

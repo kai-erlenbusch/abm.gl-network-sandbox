@@ -1,5 +1,5 @@
 // @ts-ignore
-import { storage, float, Fn, If, uint, vec4, instanceIndex, Loop, uniform, mod } from 'three/tsl';
+import { vec3, vec4, Fn, instanceIndex, storage, uint, pass, instancedArray, float, If, Loop, uniform, mod } from 'three/tsl';
 import { StorageInstancedBufferAttribute } from 'three/webgpu';
 import { prngHash } from '../math/PRNG';
 
@@ -38,8 +38,11 @@ export class VirusDynamicsEngine {
             randomSeed: uniform(Math.random())
         };
 
-        this.stateBufferRead = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
-        this.stateBufferWrite = storage(new StorageInstancedBufferAttribute(new Float32Array(agentCount * 4), 4), 'vec4', agentCount);
+        // Use instancedArray instead of manually instancing StorageInstancedBufferAttribute
+        this.stateBufferRead = instancedArray(agentCount, 'vec4');
+        (this.stateBufferRead.value as any).myId = Math.random();
+        this.stateBufferWrite = instancedArray(agentCount, 'vec4');
+        (this.stateBufferWrite.value as any).myId = Math.random();
         
         this.neighborCounts = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
         this.neighborStartIndices = storage(new StorageInstancedBufferAttribute(new Uint32Array(agentCount), 1), 'uint', agentCount);
@@ -67,9 +70,6 @@ export class VirusDynamicsEngine {
             // Timer update
             currentTimer.addAssign(1.0);
             totalTicks.addAssign(1.0);
-            If(currentTimer.greaterThanEqual(this.uniforms.virusCheckFrequency), () => {
-                currentTimer.assign(0.0);
-            });
             
             const nextState = currentState.toVar();
             

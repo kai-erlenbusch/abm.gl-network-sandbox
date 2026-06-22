@@ -43,10 +43,10 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     number_of_nodes: 150,
     average_node_degree: 6,
     initial_outbreak_size: 3,
-    virus_spread_chance: 0.025,
+    virus_spread_chance: 2.5,
     virus_check_frequency: 1.0,
-    recovery_chance: 0.05,
-    gain_resistance_chance: 0.05,
+    recovery_chance: 5.0,
+    gain_resistance_chance: 5.0,
   },
   setDynamicParam: (key: string, value: number) => 
     set((state) => ({ dynamicParams: { ...state.dynamicParams, [key]: value } })),

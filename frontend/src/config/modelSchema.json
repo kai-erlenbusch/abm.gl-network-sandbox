@@ -7,10 +7,10 @@
     { "type": "number", "id": "number_of_nodes", "label": "number-of-nodes", "min": 50, "max": 50000, "step": 50, "default": 2000 },
     { "type": "slider", "id": "average_node_degree", "label": "average-node-degree", "min": 1, "max": 15, "step": 1, "default": 6 },
     { "type": "slider", "id": "initial_outbreak_size", "label": "initial-outbreak-size", "min": 1, "max": 50, "step": 1, "default": 3 },
-    { "type": "slider", "id": "virus_spread_chance", "label": "virus-spread-chance (%)", "min": 0.0, "max": 1.0, "step": 0.005, "default": 0.025 },
+    { "type": "slider", "id": "virus_spread_chance", "label": "virus-spread-chance (%)", "min": 0.0, "max": 100.0, "step": 0.1, "default": 2.5 },
     { "type": "slider", "id": "virus_check_frequency", "label": "virus-check-frequency", "min": 1, "max": 100, "step": 1, "default": 1.0 },
-    { "type": "slider", "id": "recovery_chance", "label": "recovery-chance (%)", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.05 },
-    { "type": "slider", "id": "gain_resistance_chance", "label": "gain-resistance-chance (%)", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.05 }
+    { "type": "slider", "id": "recovery_chance", "label": "recovery-chance (%)", "min": 0.0, "max": 100.0, "step": 0.1, "default": 5.0 },
+    { "type": "slider", "id": "gain_resistance_chance", "label": "gain-resistance (if recovered %)", "min": 0.0, "max": 100.0, "step": 0.1, "default": 5.0 }
   ],
   "plots": [
     { "id": "status", "title": "Network Status" }
